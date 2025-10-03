@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useWallet } from '@solana/wallet-adapter-react'
+import { useTonConnectUI } from '@tonconnect/ui-react'
 
 // Crypto assets data
 const walletAssets = [
@@ -92,12 +94,15 @@ export default function NairaXExchange() {
   const [accountNumber, setAccountNumber] = useState("")
   const [selectedBank, setSelectedBank] = useState("")
   const [nairaAmount, setNairaAmount] = useState("")
-  const [walletConnected, setWalletConnected] = useState(false)
-  const [isConnecting, setIsConnecting] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [verifiedAccount, setVerifiedAccount] = useState<{ name: string; bank: string } | null>(null)
+  const [showWalletModal, setShowWalletModal] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Wallet hooks
+  const { publicKey, connected: solanaConnected } = useWallet()
+  const [tonConnectUI] = useTonConnectUI()
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -141,20 +146,17 @@ export default function NairaXExchange() {
     setNairaAmount(formatNairaAmount(value))
   }
 
-  const connectWallet = async () => {
-    if (!walletConnected) {
-      setIsConnecting(true)
-      // Simulate wallet connection
-      setTimeout(() => {
-        setWalletConnected(true)
-        setIsConnecting(false)
-        alert(
-          "Wallet connected successfully!\n\nAddress: 0x1A2B3C4D5E6F7890ABCDEF1234567890ABCDEF12\nNetwork: Multi-chain support enabled",
-        )
-      }, 2000)
-    } else {
-      setWalletConnected(false)
+  const connectWallet = async (type: 'solana' | 'ton') => {
+    setShowWalletModal(false)
+    if (type === 'solana') {
+      // Solana connection is handled by the adapter modal
+    } else if (type === 'ton') {
+      await tonConnectUI.connectWallet()
     }
+  }
+
+  const openWalletModal = () => {
+    setShowWalletModal(true)
   }
 
   const openContact = () => {
@@ -226,25 +228,18 @@ Languages: English, Yoruba, Hausa, Igbo`)
               Contact Us
             </Button>
             <Button
-              onClick={connectWallet}
-              disabled={isConnecting}
-              className={`${
-                walletConnected
+              onClick={openWalletModal}
+              className={`${(solanaConnected || (tonConnectUI && tonConnectUI.connected))
                   ? "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
                   : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
-              }`}
+                }`}
             >
-              {isConnecting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
-                  Connecting...
-                </>
-              ) : walletConnected ? (
+              {(solanaConnected || (tonConnectUI && tonConnectUI.connected)) ? (
                 <>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="mr-2">
                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                   </svg>
-                  0x1A2B...3C4D
+                  {solanaConnected ? `${publicKey?.toBase58().slice(0, 6)}...${publicKey?.toBase58().slice(-4)}` : 'Ton Wallet Connected'}
                 </>
               ) : (
                 <>
@@ -495,6 +490,25 @@ Languages: English, Yoruba, Hausa, Igbo`)
           background: linear-gradient(135deg, #2775ca, #4c9aff);
         }
       `}</style>
+
+      {showWalletModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold mb-4">Select Wallet</h3>
+            <div className="space-y-3">
+              <Button onClick={() => connectWallet('solana')} className="w-full bg-blue-600 hover:bg-blue-700">
+                Connect Solana Wallet
+              </Button>
+              <Button onClick={() => connectWallet('ton')} className="w-full bg-green-600 hover:bg-green-700">
+                Connect Ton Wallet
+              </Button>
+            </div>
+            <Button onClick={() => setShowWalletModal(false)} variant="outline" className="w-full mt-4">
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

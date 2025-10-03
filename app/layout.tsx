@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import "./globals.css"
+import { WalletProviders } from "@/components/wallet-providers"
 
 export const metadata: Metadata = {
   title: "ZirraPay - Asset exchange",
@@ -20,7 +21,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <Suspense fallback={null}>{children}</Suspense>
+        <WalletProviders>
+          <Suspense fallback={null}>{children}</Suspense>
+        </WalletProviders>
         <Analytics />
       </body>
     </html>

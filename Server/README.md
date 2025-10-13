@@ -1,10 +1,7 @@
 ## Server Overview
 
-This FastAPI service powers Solana wallet operations and exposes token metadata cached from Jupiter.
+This FastAPI service powers wallet operations and exposes token metadata cached from Jupiter and other Dexes.
 
-# Server Overview
-
-This FastAPI service powers Solana wallet operations and exposes token metadata cached from Jupiter.
 
 ## Requirements
 

@@ -3,7 +3,7 @@ from redis.asyncio import Redis
 from scheduler import setup_jupiter_refresh_scheduler
 from cache import get_token_metadata
 from contextlib import asynccontextmanager
-from wallet import router as wallet_router
+from routers.solana import router as solana_wallet_router
 
 from config import get_redis
 from schemas import TokenMetadata
@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
         await redis.close()
     
 app = FastAPI(lifespan=lifespan)
-app.include_router(wallet_router)
+app.include_router(solana_wallet_router)
 
 
 

@@ -6,10 +6,10 @@ from datetime import timedelta
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
     
-    RPC_URL: str = Field(default="https://api.mainnet-beta.solana.com", description="Solana RPC URL")
+    SOLANA_RPC_URL: str = Field(default="https://api.mainnet-beta.solana.com", description="Solana RPC URL")
     
     REDIS_URL:str = Field(default="redis://localhost:6379", description="Redis connection URL")
-    SOLANA_RPC_URL: str = Field(default="https://api.mainnet-beta.solana.com", description="Solana RPC URL")
+
     JUPITER_API_BASE_URL: str = Field(default="https://quote-api.jup.ag/v6", description="Base URL for Jupiter API")
     JUPITER_TOKENS_URL: str = Field(default="https://lite-api.jup.ag/tokens/v2/tag?query=verified", description="URL to fetch verified tokens from Jupiter")
     REDIS_KEY: str = Field(default="jupiter:verified_tokens", description="Redis key for cached Jupiter tokens")

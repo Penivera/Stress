@@ -21,7 +21,7 @@ This FastAPI service powers wallet operations and exposes token metadata cached 
 
 Set the following variables or edit `config.py`:
 
-- `RPC_URL` – Solana RPC endpoint.
+- `SOLANA_RPC_URL` – Solana RPC endpoint.
 - `JUPITER_API_BASE_URL` – Jupiter aggregator API root.
 - `REDIS_URL` – Redis connection string (optional if using defaults).
 

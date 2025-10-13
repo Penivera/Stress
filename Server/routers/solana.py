@@ -19,7 +19,7 @@ from redis.asyncio import Redis
 
 
 # --- FastAPI App ---
-router = APIRouter(tags=["Wallet"], prefix="/wallet") # type: ignore
+router = APIRouter(tags=["Wallet"], prefix="/solana/wallet")  # type: ignore
 
 
 # --- Endpoints ---

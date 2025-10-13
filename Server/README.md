@@ -15,7 +15,7 @@ This FastAPI service powers Solana wallet operations and exposes token metadata 
 ## Key Components
 
 - `main.py` – FastAPI app factory, lifespan hook, and token metadata endpoint.
-- `wallet.py` – `/wallet` router for wallet balances and swap preparation.
+- `solana.py` – `/wallet` router for wallet balances and swap preparation.
 - `cache.py` – Async helpers to fetch and cache Jupiter token lists in Redis.
 - `scheduler.py` – APScheduler setup that refreshes the cache daily at midnight.
 - `schemas.py` – Pydantic models shared by the API.

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useWallet } from '@solana/wallet-adapter-react'
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useTonConnectUI } from '@tonconnect/ui-react'
 
 // Crypto assets data
@@ -102,6 +103,7 @@ export default function NairaXExchange() {
 
   // Wallet hooks
   const { publicKey, connected: solanaConnected } = useWallet()
+  const { setVisible: setSolanaWalletModalVisible } = useWalletModal();
   const [tonConnectUI] = useTonConnectUI()
 
   // Close dropdown when clicking outside
@@ -149,7 +151,7 @@ export default function NairaXExchange() {
   const connectWallet = async (type: 'solana' | 'ton') => {
     setShowWalletModal(false)
     if (type === 'solana') {
-      // Solana connection is handled by the adapter modal
+      setSolanaWalletModalVisible(true)
     } else if (type === 'ton') {
       await tonConnectUI.connectWallet()
     }
@@ -230,8 +232,8 @@ Languages: English, Yoruba, Hausa, Igbo`)
             <Button
               onClick={openWalletModal}
               className={`${(solanaConnected || (tonConnectUI && tonConnectUI.connected))
-                  ? "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
-                  : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                ? "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
+                : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
                 }`}
             >
               {(solanaConnected || (tonConnectUI && tonConnectUI.connected)) ? (

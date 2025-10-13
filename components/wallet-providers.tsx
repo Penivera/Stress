@@ -1,24 +1,24 @@
 "use client"
 
-import { ReactNode } from 'react'
+import { useMemo, ReactNode } from 'react'
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
+import { clusterApiUrl } from '@solana/web3.js'
 
 // Import wallet adapter CSS
 import '@solana/wallet-adapter-react-ui/styles.css'
 
-const network = WalletAdapterNetwork.Mainnet
-const wallets = [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
-
-// Placeholder manifest URL - replace with your actual manifest
-const tonManifestUrl = 'https://refactored-halibut-x5rjw7j9g676f4r7-5500.app.github.dev/tonconnect-manifest.json'
-
 export function WalletProviders({ children }: { children: ReactNode }) {
+    const network = WalletAdapterNetwork.Devnet;
+    const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+    const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], [network]);
+    const tonManifestUrl = '/tonconnect-manifest.json';
+
     return (
-        <ConnectionProvider endpoint={`https://api.mainnet-beta.solana.com`}>
+        <ConnectionProvider endpoint={endpoint}>
             <WalletProvider wallets={wallets} autoConnect>
                 <WalletModalProvider>
                     <TonConnectUIProvider manifestUrl={tonManifestUrl}>

@@ -19,7 +19,7 @@ from redis.asyncio import Redis
 
 
 # --- FastAPI App ---
-router = APIRouter(tags=["Wallet"], prefix="/solana/wallet")  # type: ignore
+router = APIRouter(tags=["Wallet"], prefix="/wallet/solana")  # type: ignore
 
 
 # --- Endpoints ---
@@ -134,52 +134,40 @@ async def get_wallet_tokens(
 )
 async def prepare_swap_transaction(
     swap_request: SwapRequest,
+    redis: Redis = Depends(get_redis), 
 ) -> SwapTransactionResponse:
     """
     Fetches a quote from Jupiter and prepares a transaction
     for the user to sign on the frontend.
     """
+    token_metadata = await get_token_metadata(redis, swap_request.input_mint)
+    if not token_metadata or token_metadata.get("decimals") is None:
+        raise HTTPException(status_code=400, detail="Invalid input mint address.")
+    amount = int(swap_request.amount * (10 ** int(token_metadata["decimals"])))
+    
     quote_url = (
-        f"{settings.JUPITER_API_BASE_URL}/quote?"
+        f"{settings.JUPITER_ORDER_URL}?"
         f"inputMint={swap_request.input_mint}&"
         f"outputMint={swap_request.output_mint}&"
-        f"amount={swap_request.amount}&"
-        f"slippageBps={swap_request.slippage_bps}"
+        f"amount={amount}&"
+        f"taker={swap_request.user_public_key}&"
     )
 
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(quote_url) as quote_response:
-                quote_response.raise_for_status()
-                quote_data = await quote_response.json()
+            async with session.get(quote_url) as order_response:
+                order_response.raise_for_status()
+                order_data = await order_response.json()
+                #print(order_data)
         except aiohttp.ClientError as e:
             raise HTTPException(
                 status_code=502, detail=f"Failed to get quote from Jupiter API: {e}"
             )
-
-        try:
-            swap_payload = {
-                "quoteResponse": quote_data,
-                "userPublicKey": swap_request.user_public_key,
-                "wrapAndUnwrapSol": True,
-            }
-            async with session.post(
-                f"{settings.JUPITER_API_BASE_URL}/swap", json=swap_payload
-            ) as swap_response:
-                swap_response.raise_for_status()
-                swap_data = await swap_response.json()
-
-            swap_tx = swap_data.get("swapTransaction")
-            if not swap_tx:
-                raise HTTPException(
-                    status_code=502,
-                    detail="Swap transaction missing in Jupiter response",
-                )
-
-            return SwapTransactionResponse(swapTransaction=swap_tx)
-        except aiohttp.ClientError as e:
+        if order_data.get("errorCode") == 1 and "Insufficient funds" in order_data.get("errorMessage", ""):
             raise HTTPException(
-                status_code=502, detail=f"Failed to get swap transaction: {e}"
+                status_code=400,
+                detail="User has insufficient funds for this swap."
             )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+
+        transaction = order_data.get("transaction")
+        return SwapTransactionResponse(swapTransaction=transaction)

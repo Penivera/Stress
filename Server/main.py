@@ -12,7 +12,7 @@ async def lifespan(app: FastAPI):
     redis = get_redis()
     # Kick off background refresh loop
     import asyncio
-    asyncio.create_task(setup_jupiter_refresh_scheduler(redis))
+    asyncio.create_task(setup_jupiter_refresh_scheduler(redis)) # type: ignore
     try:
         yield
     finally:

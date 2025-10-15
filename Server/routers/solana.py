@@ -1,10 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Path,status
 from solders.pubkey import Pubkey
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.types import TokenAccountOpts
 from spl.token.constants import TOKEN_PROGRAM_ID
-import uvicorn
 import aiohttp
 import struct
 from cache import get_token_metadata  # Import the function to get token metadata
@@ -15,14 +13,15 @@ from schemas import (
     TokenAccount,
     WalletTokensResponse,
 )
+
 from redis.asyncio import Redis
 
 
-# --- FastAPI App ---
+#NOTE ---Router---
 router = APIRouter(tags=["Wallet"], prefix="/wallet/solana")  # type: ignore
 
 
-# --- Endpoints ---
+#NOTE --- Endpoints ---
 @router.get(
     "/wallet-tokens/{public_key}",
     summary="Get SPL token accounts by owner",
@@ -35,7 +34,7 @@ async def get_wallet_tokens(
         description="Base58 encoded Solana public key.",
         example="4kg8oh3jdNtn7j2wcS7TrUua31AgbLzDVkBZgTAe44aF",
     ),
-    redis: Redis = Depends(get_redis),  # Use the Redis dependency
+    redis: Redis = Depends(get_redis),  #NOTE Use the Redis dependency
 ) -> WalletTokensResponse:
     """
     Gets all SPL token accounts owned by the provided wallet address.
@@ -62,15 +61,15 @@ async def get_wallet_tokens(
         for account_info in response.value:
             acc = account_info.account
 
-            # --- Correctly Parse Token Information ---
-            # Parse the mint address (first 32 bytes of the account data)
+            #NOTE --- Correctly Parse Token Information ---
+            #NOTE Parse the mint address (first 32 bytes of the account data)
             mint_pubkey = Pubkey(acc.data[0:32])
             mint_address = str(mint_pubkey)
 
-            # Parse the raw token amount (at offset 64)
+            #NOTE Parse the raw token amount (at offset 64)
             (raw_token_amount,) = struct.unpack("<Q", acc.data[64:72])
 
-            # Get token metadata for display information
+            #NOTE Get token metadata for display information
             token_metadata = await get_token_metadata(redis, mint_address)
 
             decimals = None
@@ -129,7 +128,6 @@ async def get_wallet_tokens(
 @router.post(
     "/swap-transaction",
     summary="Prepare a Jupiter swap transaction",
-    tags=["Swap"],
     response_model=SwapTransactionResponse,
 )
 async def prepare_swap_transaction(
@@ -165,7 +163,7 @@ async def prepare_swap_transaction(
             )
         if order_data.get("errorCode") == 1 and "Insufficient funds" in order_data.get("errorMessage", ""):
             raise HTTPException(
-                status_code=400,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User has insufficient funds for this swap."
             )
 

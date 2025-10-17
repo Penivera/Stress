@@ -15,7 +15,7 @@ export function WalletProviders({ children }: { children: ReactNode }) {
     const network = WalletAdapterNetwork.Devnet;
     const endpoint = useMemo(() => clusterApiUrl(network), [network]);
     const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], [network]);
-    const tonManifestUrl = '/tonconnect-manifest.json';
+    const tonManifestUrl = 'https://raw.githubusercontent.com/Penivera/Stress/refs/heads/main/tonconnect-manifest.json';
 
     return (
         <ConnectionProvider endpoint={endpoint}>

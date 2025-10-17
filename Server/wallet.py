@@ -168,6 +168,7 @@ async def prepare_swap_transaction(
             ) as swap_response:
                 swap_response.raise_for_status()
                 swap_data = await swap_response.json()
+                print(swap_data)
 
             swap_tx = swap_data.get("swapTransaction")
             if not swap_tx:

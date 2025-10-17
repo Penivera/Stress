@@ -1,0 +1,171 @@
+from fastapi import APIRouter, Depends, HTTPException, Path,status
+from solders.pubkey import Pubkey
+from solana.rpc.async_api import AsyncClient
+from solana.rpc.types import TokenAccountOpts
+from spl.token.constants import TOKEN_PROGRAM_ID
+import aiohttp
+import struct
+from cache import get_token_metadata  # Import the function to get token metadata
+from config import get_redis, settings  # Import the Redis dependency
+from schemas import (
+    SwapRequest,
+    SwapTransactionResponse,
+    TokenAccount,
+    WalletTokensResponse,
+)
+
+from redis.asyncio import Redis
+
+
+#NOTE ---Router---
+router = APIRouter(tags=["Wallet"], prefix="/wallet/solana")  # type: ignore
+
+
+#NOTE --- Endpoints ---
+@router.get(
+    "/wallet-tokens/{public_key}",
+    summary="Get SPL token accounts by owner",
+    tags=["Wallet"],
+    response_model=WalletTokensResponse,
+)
+async def get_wallet_tokens(
+    public_key: str = Path(
+        ...,
+        description="Base58 encoded Solana public key.",
+        example="4kg8oh3jdNtn7j2wcS7TrUua31AgbLzDVkBZgTAe44aF",
+    ),
+    redis: Redis = Depends(get_redis),  #NOTE Use the Redis dependency
+) -> WalletTokensResponse:
+    """
+    Gets all SPL token accounts owned by the provided wallet address.
+    """
+    try:
+        owner = Pubkey.from_string(public_key)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid public key format.")
+
+    try:
+        async with AsyncClient(settings.SOLANA_RPC_URL) as rpc:
+            response = await rpc.get_token_accounts_by_owner(
+                owner, TokenAccountOpts(program_id=TOKEN_PROGRAM_ID)
+            )
+
+        if not response.value:
+            return WalletTokensResponse(
+                owner=public_key,
+                token_accounts=[],
+                message="No token accounts found.",
+            )
+
+        tokens: list[TokenAccount] = []
+        for account_info in response.value:
+            acc = account_info.account
+
+            #NOTE --- Correctly Parse Token Information ---
+            #NOTE Parse the mint address (first 32 bytes of the account data)
+            mint_pubkey = Pubkey(acc.data[0:32])
+            mint_address = str(mint_pubkey)
+
+            #NOTE Parse the raw token amount (at offset 64)
+            (raw_token_amount,) = struct.unpack("<Q", acc.data[64:72])
+
+            #NOTE Get token metadata for display information
+            token_metadata = await get_token_metadata(redis, mint_address)
+
+            decimals = None
+            name = symbol = icon = None
+            tags = None
+            usd_price = None
+
+            if token_metadata:
+                if (decimals_value := token_metadata.get("decimals")) is not None:
+                    try:
+                        decimals = int(decimals_value)
+                    except (TypeError, ValueError):
+                        decimals = None
+                name = token_metadata.get("name")
+                symbol = token_metadata.get("symbol")
+                icon = token_metadata.get("icon") or token_metadata.get("logoURI")
+                tags = token_metadata.get("tags")
+                usd_price_value = token_metadata.get("usdPrice")
+                if usd_price_value is not None:
+                    try:
+                        usd_price = float(usd_price_value)
+                    except (TypeError, ValueError):
+                        usd_price = None
+
+            if decimals is not None:
+                decimal_balance = raw_token_amount / (10**decimals)
+            else:
+                decimal_balance = float(raw_token_amount)
+
+            tokens.append(
+                TokenAccount(
+                    pubkey=str(account_info.pubkey),
+                    mint=mint_address,
+                    owner=str(acc.owner),
+                    raw_balance=raw_token_amount,
+                    balance=decimal_balance,
+                    lamports_for_rent=acc.lamports,
+                    decimals=decimals,
+                    name=name,
+                    symbol=symbol,
+                    icon=icon,
+                    tags=tags,
+                    usd_price=usd_price,
+                )
+            )
+
+        return WalletTokensResponse(owner=public_key, token_accounts=tokens)
+
+    except Exception as e:
+        print(f"Error fetching token accounts: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching token accounts: {e}"
+        )
+
+
+@router.post(
+    "/swap-transaction",
+    summary="Prepare a Jupiter swap transaction",
+    response_model=SwapTransactionResponse,
+)
+async def prepare_swap_transaction(
+    swap_request: SwapRequest,
+    redis: Redis = Depends(get_redis), 
+) -> SwapTransactionResponse:
+    """
+    Fetches a quote from Jupiter and prepares a transaction
+    for the user to sign on the frontend.
+    """
+    token_metadata = await get_token_metadata(redis, swap_request.input_mint)
+    if not token_metadata or token_metadata.get("decimals") is None:
+        raise HTTPException(status_code=400, detail="Invalid input mint address.")
+    amount = int(swap_request.amount * (10 ** int(token_metadata["decimals"])))
+    
+    quote_url = (
+        f"{settings.JUPITER_ORDER_URL}?"
+        f"inputMint={swap_request.input_mint}&"
+        f"outputMint={swap_request.output_mint}&"
+        f"amount={amount}&"
+        f"taker={swap_request.user_public_key}&"
+    )
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(quote_url) as order_response:
+                order_response.raise_for_status()
+                order_data = await order_response.json()
+                #print(order_data)
+        except aiohttp.ClientError as e:
+            raise HTTPException(
+                status_code=502, detail=f"Failed to get quote from Jupiter API: {e}"
+            )
+        if order_data.get("errorCode") == 1 and "Insufficient funds" in order_data.get("errorMessage", ""):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User has insufficient funds for this swap."
+            )
+
+        transaction = order_data.get("transaction")
+        return SwapTransactionResponse(swapTransaction=transaction)
